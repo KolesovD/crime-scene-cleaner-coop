@@ -1,0 +1,7 @@
+bin/
+obj/
+local/
+dist/
+.claude/
+.unlazy/
+.unlazy-hook-state.json

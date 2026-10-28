@@ -154,7 +154,9 @@ public static class Dyn
             if (d != null) RegisterShards(d, breakable, false);
             byId.TryGetValue(id, out o);
         }
-        if (o != null && o.Mine) return;   // ours (a late echo after we took it over)
+        // Ours: a late echo after we took it over, except "gone": another player's trash can picked it up
+        // (OnConsumed), and it must go here too, or a shard picked up there stayed here (breakhit suite).
+        if (o != null && o.Mine && (alive || !inVan)) return;
         if (!alive)
         {
             if (o?.Go != null)

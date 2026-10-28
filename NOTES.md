@@ -436,6 +436,26 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### CCTV recordings and shards picked up by the other player (contributed fix, 2026-10-28)
+- CCTV (Smart House laptop, checked in game): the 10 recordings ("1/05/2023" .. "10/05/2023") exist as soon as
+  the job loads, without the UI. The game makes them with `new CCTVRecord(name)`, a MonoBehaviour without a native
+  object, so Unity's `== null` is true for every one and the `rec != null` filters in Cctv.Tick and the cctv bot
+  skipped them all ("10 null entries"; the managed object and its name are fine). Deleting in the UI goes through
+  HackableComputerPresenter.HandleFileDelete, which removes the record from the model's list itself (no
+  RemoveRecordInFolder call). RemoveRecordInFolder(name) on the other machine works, and an empty folder turns the
+  "Delete CCTV" quest to Success.
+- Fix: Cctv.IsRecord (managed reference, not Unity's ==); a prefix on HandleFileDelete (instance cast checked,
+  for folded bodies); the watch records every name from the job's start and sends deletions made before the other
+  player was connected once live. cctv suite: the client deletes one recording, then all, through
+  HandleFileDelete; checks the host's folder and the quest on both. 7/7; the shipped Cctv.cs on the same suite:
+  host keeps 10 recordings, quest Active (3 of 7 fail).
+- Shards: a shard simulated by one player and picked up by another player's trash can stayed on the first
+  machine: Dyn.OnState returned for its own objects before the "gone" branch. Now "gone, collected" is applied to
+  our own object too. New breakhit suite (tools/run-pair.ps1 -Test breakhit): the client throws an item onto a
+  bottle the host owns (it breaks once, the client simulates the shards, same spots on both), then the host picks
+  up one of the client's shards. 6/6; before the fix the shard stayed on the client.
+- Run with these changes: world2, trash, bodies, stains, items and the core tests (results in the PR).
+
 ### Friend test of 0.4.1 -> 0.4.2 (2026-10-27)
 - Villa: host key 85C12853, client 155AA62C, same 535 items: some table differed and the whole job's sync was
   off (label still "2 players"). Now the scene key is the entity space only (items + bodies); every other table

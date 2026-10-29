@@ -151,8 +151,9 @@ replay is checked by arguments and hit counts; whether a real mop stroke looks t
 unverified until a human plays.
 
 Not shared (known): shards from cracked items (each machine has its own), tool puppets can't be used by the
-other player (rinsing in a friend's bucket), re-dirtying a cleaned stain (raises don't spread), MusicDisc (hub
-record player only), plain Door (menu/hub only). Each player keeps own money, skill points and cassettes in own save.
+other player (rinsing in a friend's bucket), re-dirtying a cleaned stain (raises don't spread; checked later: not
+a gap, see the 2026-10-28 contribution), MusicDisc (hub record player only), plain Door (menu/hub only).
+Each player keeps own money, skill points and cassettes in own save.
 
 ## Owner's manual two-window test of 0.2.0 (2026-10-26, logs in local/manual1)
 
@@ -250,7 +251,7 @@ the two copies' saves were at different missions.
   (TruckExitCTSPhone, CTSTruckEscape, TruckExitCTS) have no player Animator bound; the only human Animators in
   the scene are the 3 bodies (DrugDealerAnimAvatar, Girl02Avatar). So no player model is loaded in a job; it
   would have to come from the hub/intro scenes or Addressables. Unknown which.
-- Shards, using another player's bucket, re-dirtying.
+- Shards, using another player's bucket, re-dirtying (re-dirtying: not a gap, see the 2026-10-28 contribution).
 
 ## Unknown
 
@@ -455,6 +456,16 @@ victims' bodies" only on the host, a restart only on the host.
   bottle the host owns (it breaks once, the client simulates the shards, same spots on both), then the host picks
   up one of the client's shards. 6/6; before the fix the shard stayed on the client.
 - Run with these changes: world2, trash, bodies, stains, items and the core tests (results in the PR).
+- Re-dirtying a cleaned stain is not a gap (probe in the contributor's mod, Dealer's Apartment, 2026-10-29). In the
+  game code, Taint.SetIntensity is called by CleanableDecal.Update (intensity follows the decal texture, and strokes
+  only erase it), the save loaders, the cheat panel, and FootprintSpawner.LeaveFootprint (on the new footprint it just
+  made). Every way of adding blood makes a NEW decal through BloodSpreaderController.ProjectBlood: dirty tool
+  (CleaningItem.CleanOrTaint), footprints, bucket spill (LiquidContainer.TryCreateBloodSpill), drips; Taint.Update
+  only sets the sort order. In game: a mop cleaned a stain 1.000 -> 0.784; the mop set fully dirty and stroked the
+  same spot for 15 s (29 CleanOrTaint calls): no change; blood projected on top: a new decal, the old one unchanged.
+  No rise on any of the 371 stains (SetIntensity hook and a scan every second), two runs. So the min rule matches the
+  game, and the stains replay of ProjectBlood already covers re-dirtying. Not seen: the dirty mop's own blood (none
+  spawned in that setup).
 
 ### Friend test of 0.4.1 -> 0.4.2 (2026-10-27)
 - Villa: host key 85C12853, client 155AA62C, same 535 items: some table differed and the whole job's sync was

@@ -437,6 +437,21 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Cleaning products in buckets and power washers (contributed, 2026-11-01)
+- Owner's request: share the products in buckets (and the tools upgraded from them), as the earlier csc-coop
+  prototype did. Only the bucket's water and dirt were shared; products not, and using another player's bucket
+  changed it here only.
+- Dyn tool state now carries the products (LiquidContainer.activeBuffs / PowerWasherStation.activeBuffs as
+  "buffId:effectiveness:threshold;", rebuilt with TryFindBuffBase + BuffInstance.LoadBuffData) and the station's
+  water. Using another player's bucket or station here (CleanTool, TryAddBuff, TryAddWater, AddWater, CleanWater;
+  station TryAddBuff, TryAddWater) takes it over first, so its new state goes out from here. A mop rinsed in a
+  friend's bucket takes its products (CleanTool copies them). PowerWasherStation overrides PickUp: the
+  only-the-owner rule is patched there too.
+- products suite (-Test products -Mission 11): the host pours green into its bucket; the client sees it, rinses its
+  mop there (the mop gets it), empties it, fills it and pours red (a one-star bucket holds one product). PASS 6/6
+  (both end with red, same water and dirt); mutant bucket-look (no take-over on use): the host keeps green, FAIL.
+  toolcarry 7/7, trash 8/8.
+
 ### Doors drifting apart, footprints missing on some floors (contributed, 2026-11-01)
 - Owner's report (Developers' Hell): a door open on the host is closed on the client, and the host closing it opens it
   there; a footprint made on one machine sometimes doesn't appear on the other.

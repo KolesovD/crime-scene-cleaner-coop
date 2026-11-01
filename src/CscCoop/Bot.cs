@@ -124,6 +124,7 @@ public partial class Bot : MonoBehaviour
         if (test == "toolcarry") ToolCarryTest(t, ses, w);
         if (test == "footsteps") FootstepsTest(t, ses, w);
         if (test == "doorsync") DoorSyncTest(t, ses, w);
+        if (test == "products") ProductsTest(t, ses, w);
         if (test == "world2") { try { World2Test(t, ses, w); } catch (Exception e) { Plugin.L.LogError($"WORLD2 bot step {step} failed: {e}"); } }
         if (test != "jobs" && t > Env.Int("CSCCOOP_QUIT_AFTER", 40))
         {

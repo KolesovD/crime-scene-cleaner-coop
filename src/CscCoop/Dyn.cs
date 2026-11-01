@@ -17,8 +17,11 @@ namespace CscCoop;
 //    bucket or lamp (owner's request). Only the player it belongs to (the id's player number) can put a tool back
 //    into an inventory (PortableItem.PickUp): picked up by someone else it would be in two inventories; its owner
 //    takes it back first if someone else simulates it.
-//  - Buckets carry their water and dirt level (LiquidContainer), so the friend's bucket isn't shown empty
-//    (owner's request; looks only: nobody can use another player's bucket).
+//  - Buckets carry their water and dirt level (LiquidContainer) and their cleaning products (activeBuffs, as
+//    "buffId:effectiveness:threshold;..."), power washer stations their water and products: a friend's bucket
+//    looks the same, and a mop rinsed in it takes its products (CleanTool copies the bucket's buffs). Using another
+//    player's bucket or station here (rinsing, pouring a product or water in, emptying it) takes it over first, so its new
+//    levels and products come from this machine (as in the earlier csc-coop prototype).
 //  - Gone (bag merged into another, bag into the van, tool picked up): alive=false removes the puppet; a bag
 //    that went into the van is collected on the others' side too, so their report counts it.
 [HarmonyPatch]
@@ -38,7 +41,9 @@ public static class Dyn
         public Vector3 Scale = Vector3.one;
         public float NextSend;
         public LiquidContainer Liquid;
+        public PowerWasherStation Washer;
         public float SentWater = -1, SentTaint = -1;
+        public string SentBuffs = "", AppliedBuffs = "";
     }
 
     static readonly Dictionary<uint, Obj> byId = new();
@@ -66,7 +71,7 @@ public static class Dyn
         var s = S;
         byte me = s == null ? (byte)0 : s.Me == CoopCore.Session.NoPlayer ? (byte)0 : s.Me;
         var o = new Obj { Id = ((uint)me << 20) | (++counter & 0xFFFFF), Kind = kind, Name = PrefabName(go.name), Go = go, Mine = true };
-        if (kind == Kind.Tool) o.Liquid = go.GetComponentInChildren<LiquidContainer>(true);
+        if (kind == Kind.Tool) Equip(o);
         byId[o.Id] = o; byGo[go.Pointer] = o;
         Spawned++;
     }
@@ -91,6 +96,8 @@ public static class Dyn
                 var t = o.Go.transform;
                 bool moved = (t.position - o.SentPos).sqrMagnitude > 1e-4f || Quaternion.Angle(t.rotation, o.SentRot) > 0.5f || o.SentPos == Vector3.zero;
                 if (o.Liquid != null && (Mathf.Abs(o.Liquid.WaterLevel - o.SentWater) > 0.01f || Mathf.Abs(o.Liquid.TaintLevel - o.SentTaint) > 0.01f)) moved = true;
+                if (o.Washer != null && Mathf.Abs(o.Washer.waterLevel - o.SentWater) > 0.01f) moved = true;
+                if ((o.Liquid != null || o.Washer != null) && Buffs(o) != o.SentBuffs) moved = true;
                 if (!moved && o.Go.activeInHierarchy == true && o.NextSend > 0) continue;
                 o.NextSend = now + 0.1f;
                 SendState(o, o.Go.activeInHierarchy, false);
@@ -127,7 +134,10 @@ public static class Dyn
         o.SentPos = pos; o.SentRot = rot;
         bool liquid = o.Liquid != null;
         float water = liquid ? o.Liquid.WaterLevel : 0, taint = liquid ? o.Liquid.TaintLevel : 0;
-        o.SentWater = water; o.SentTaint = taint;
+        bool washer = o.Washer != null;
+        if (washer) water = o.Washer.waterLevel;
+        string buffs = Buffs(o);
+        o.SentWater = water; o.SentTaint = taint; o.SentBuffs = buffs;
         WorldEvents.Send(Ev.DynState, w =>
         {
             w.Write(o.Id); w.Write((byte)o.Kind); w.Write(o.Name ?? "");
@@ -135,6 +145,7 @@ public static class Dyn
             w.Write(scale.x); w.Write(scale.y); w.Write(scale.z);
             w.Write(alive); w.Write(inVan);
             w.Write(liquid); w.Write(water); w.Write(taint);
+            w.Write(buffs); w.Write(washer);   // last: 0.4.2 readers stop before them
         }, StateBase | o.Id);
     }
 
@@ -146,6 +157,9 @@ public static class Dyn
         var scale = new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
         bool alive = r.ReadBoolean(), inVan = r.ReadBoolean();
         bool liquid = r.ReadBoolean(); float water = r.ReadSingle(), taint = r.ReadSingle();
+        bool more = r.BaseStream.Position < r.BaseStream.Length;
+        string buffs = more ? r.ReadString() : null;
+        bool washer = more && r.ReadBoolean();
         byId.TryGetValue(id, out var o);
         if (o == null && kind == Kind.Shard)
         {
@@ -178,7 +192,7 @@ public static class Dyn
             var go = Build(kind, name, pos, rot);
             if (go == null) return;
             o = new Obj { Id = id, Kind = kind, Name = name, Go = go, Mine = false };
-            if (kind == Kind.Tool) o.Liquid = go.GetComponentInChildren<LiquidContainer>(true);
+            if (kind == Kind.Tool) Equip(o);
             byId[id] = o; byGo[go.Pointer] = o;
             Puppets++;
         }
@@ -189,7 +203,75 @@ public static class Dyn
             if (Mathf.Abs(o.Liquid.WaterLevel - water) > 0.005f) o.Liquid.SetWaterLevel(water);
             if (Mathf.Abs(o.Liquid.TaintLevel - taint) > 0.005f) o.Liquid.SetTaintLevel(taint);
         }
+        if (washer && o.Washer != null && Mathf.Abs(o.Washer.waterLevel - water) > 0.005f) { o.Washer.waterLevel = water; o.Washer.SetWaterLevel(); }
+        if (buffs != null && buffs != o.AppliedBuffs && (o.Liquid != null || o.Washer != null))
+        {
+            o.AppliedBuffs = buffs;
+            if (o.Liquid != null) SetBuffs(o.Liquid.activeBuffs, buffs, d => o.Liquid.TryFindBuffBase(d, out var b) ? b : null);
+            else SetBuffs(o.Washer.activeBuffs, buffs, d => o.Washer.TryFindBuffBase(d, out var b) ? b : null);
+            Plugin.L.LogInfo($"COOP {o.Name} {o.Id:X}: products '{buffs}'");
+        }
     }
+
+    static void Equip(Obj o)
+    {
+        o.Liquid = o.Go.GetComponentInChildren<LiquidContainer>(true);
+        var pi = o.Go.GetComponent<PortableItem>();
+        o.Washer = pi != null ? pi.TryCast<PowerWasherStation>() : null;
+    }
+
+    // ---- cleaning products ----
+
+    static string Buffs(Obj o)
+    {
+        var list = o.Liquid != null ? o.Liquid.activeBuffs : o.Washer != null ? o.Washer.activeBuffs : null;
+        if (list == null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in list)
+        {
+            if (b == null) continue;
+            var d = b.CreateBuffData();
+            sb.Append(System.FormattableString.Invariant($"{d.buffId}:{d.effectiveness:F2}:{d.currentEffectivenessThreshold:F2};"));
+        }
+        return sb.ToString();
+    }
+
+    static void SetBuffs(Il2CppSystem.Collections.Generic.List<BuffInstance> list, string s, Func<BucketBuffData, BuffBase> find)
+    {
+        if (list == null) return;
+        list.Clear();
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        foreach (var part in s.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var f = part.Split(':');
+            if (f.Length != 3) continue;
+            var data = new BucketBuffData { buffId = int.Parse(f[0], ci), effectiveness = float.Parse(f[1], ci), currentEffectivenessThreshold = float.Parse(f[2], ci) };
+            var buff = find(data);
+            if (buff == null) { Plugin.L.LogWarning($"COOP unknown cleaning product {data.buffId}"); continue; }
+            var bi = new BuffInstance(buff);
+            bi.LoadBuffData(data);
+            list.Add(bi);
+        }
+    }
+
+    // A player here uses another player's bucket or station: take it over first (its levels and products then
+    // go out from here). Instance cast checked: IL2CPP folds identical bodies, so a patch can fire for other types.
+    static void Use(Component c)
+    {
+        var s = S;
+        if (c == null || s == null || !s.Synced || WorldEvents.Applying || Env.Get("CSCCOOP_MUTANT") == "bucket-look") return;
+        var pi = c.GetComponentInParent<PortableItem>();
+        if (pi == null || !byGo.TryGetValue(pi.gameObject.Pointer, out var o) || o.Mine || o.Kind != Kind.Tool) return;
+        TakeOver(o, s);
+    }
+
+    [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.CleanTool))] [HarmonyPrefix] static void BucketRinse(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.TryAddBuff))] [HarmonyPrefix] static void BucketProduct(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.TryAddWater))] [HarmonyPrefix] static void BucketWater(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.AddWater))] [HarmonyPrefix] static void BucketFill(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.CleanWater))] [HarmonyPrefix] static void BucketEmpty(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(PowerWasherStation), nameof(PowerWasherStation.TryAddBuff))] [HarmonyPrefix] static void WasherProduct(PowerWasherStation __instance) { if (__instance.TryCast<PowerWasherStation>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(PowerWasherStation), nameof(PowerWasherStation.TryAddWater))] [HarmonyPrefix] static void WasherWater(PowerWasherStation __instance) { if (__instance.TryCast<PowerWasherStation>() != null) Use(__instance); }
 
     static GameObject Build(Kind kind, string name, Vector3 pos, Quaternion rot)
     {
@@ -241,7 +323,11 @@ public static class Dyn
     // Whose inventory a tool belongs to: the player number its id was made with.
     static byte BelongsTo(Obj o) => (byte)(o.Id >> 20);
 
-    // Putting a placed tool back into the inventory: only its own player's, and taken back first.
+    // Putting a placed tool back into the inventory: only its own player's, and taken back first. The power
+    // washer station has its own PickUp (it overrides PortableItem's).
+    [HarmonyPatch(typeof(PowerWasherStation), nameof(PowerWasherStation.PickUp))] [HarmonyPrefix]
+    static bool WasherPickUp(PowerWasherStation __instance) => __instance.TryCast<PowerWasherStation>() == null || ToolPickUp(__instance);
+
     [HarmonyPatch(typeof(PortableItem), nameof(PortableItem.PickUp))] [HarmonyPrefix]
     static bool ToolPickUp(PortableItem __instance)
     {

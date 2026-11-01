@@ -61,17 +61,36 @@ public static class Doors
         if (i >= 0) WorldEvents.Send(Ev.DoorUnlock, w => w.Write((ushort)i), UnlockKey + (uint)i);
     }
 
-    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.OpenDoors))] [HarmonyPostfix] static void OpenS(ShortcutDoors __instance) => SendShortcut(__instance, true);
-    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.CloseDoors))] [HarmonyPostfix] static void CloseS(ShortcutDoors __instance) => SendShortcut(__instance, false);
+    // A player's click is Interact -> OnOpen -> Toggle, which animates the door itself; pushing a door is
+    // TryForceOpen/TryForceClose, a switch ExternalToggle. None of them goes through OpenDoors/CloseDoors, so only
+    // scripted opens were shared and the doors drifted apart, after which a shared open/close landed on a door that
+    // was the other way here (owner's test on Developers' Hell: open on the host, closed on the client, and the
+    // host closing it opened it there). Every path sets isClosed at once (ISIL, field +224), so the state after each
+    // is sent, once per change, and the others set it with OpenDoors/CloseDoors (never a toggle).
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.OpenDoors))] [HarmonyPostfix] static void OpenS(ShortcutDoors __instance) => SendShortcut(__instance);
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.CloseDoors))] [HarmonyPostfix] static void CloseS(ShortcutDoors __instance) => SendShortcut(__instance);
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.Toggle))] [HarmonyPostfix] static void ToggleS(ShortcutDoors __instance) { if (!OldRule) SendShortcut(__instance); }
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.TryForceOpen))] [HarmonyPostfix] static void ForceOpenS(ShortcutDoors __instance) { if (!OldRule) SendShortcut(__instance); }
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.TryForceClose))] [HarmonyPostfix] static void ForceCloseS(ShortcutDoors __instance) { if (!OldRule) SendShortcut(__instance); }
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.ExternalToggle))] [HarmonyPostfix] static void ExternalS(ShortcutDoors __instance) { if (!OldRule) SendShortcut(__instance); }
+    [HarmonyPatch(typeof(ShortcutDoors), nameof(ShortcutDoors.ResetDoors))] [HarmonyPostfix] static void ResetS(ShortcutDoors __instance) { if (!OldRule) SendShortcut(__instance); }
 
-    static void SendShortcut(ShortcutDoors d, bool open)
+    static bool OldRule => Env.Get("CSCCOOP_MUTANT") == "door-old";   // only OpenDoors/CloseDoors, as in 0.4.2
+    static readonly System.Collections.Generic.Dictionary<int, bool> sentOpen = new();
+
+    static void SendShortcut(ShortcutDoors d)
     {
         if (!WorldEvents.Live) return;
         int i = Shortcuts.IndexOf(d);
         if (i < 0) return;
+        bool open = !d.isClosed;
+        if (sentOpen.TryGetValue(i, out var was) && was == open) return;
+        sentOpen[i] = open;
         WorldEvents.Send(Ev.DoorShortcut, w => { w.Write((ushort)i); w.Write(open); }, ShortcutOpenKey + (uint)i);
         Plugin.L.LogInfo($"COOP door {i} {(open ? "opened" : "closed")}");
     }
+
+    public static void OnScene() => sentOpen.Clear();
 
     public static void OnUnlock(BinaryReader r)
     {
@@ -87,6 +106,8 @@ public static class Doors
         var d = Shortcuts[i];
         Plugin.L.LogInfo($"COOP door {i} {(open ? "opened" : "closed")} by another player{(d == null ? ", not here" : "")}");
         if (d == null) return;
+        sentOpen[i] = open;
+        if (d.isClosed != open) return;   // already that way here
         if (open) d.OpenDoors(); else d.CloseDoors();
         Applied++;
     }

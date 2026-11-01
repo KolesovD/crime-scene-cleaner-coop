@@ -114,7 +114,7 @@ public sealed class GameWorld : IWorld
         Plugin.L.LogInfo($"COOP table {scene}: {Items.Count} items, {Taints.Count} stains, {Bodies.Count} bodies, {Garbage.Count} van items{more}, key {key:X8}");
     }
 
-    static void Bodies_OnTable() { CscCoop.Bodies.OnTable(); Furniture.OnScene(); Objectives.OnScene(); Cctv.OnScene(); CscCoop.Bodies.OnScene(); }
+    static void Bodies_OnTable() { CscCoop.Bodies.OnTable(); Furniture.OnScene(); Doors.OnScene(); Objectives.OnScene(); Cctv.OnScene(); CscCoop.Bodies.OnScene(); }
     // Scene tables of the other shared things, identified by indexed hierarchy path.
     public interface ITable { string Name { get; } int Count { get; } void Build(GameWorld w, ref uint h); void Clear(); }
     public sealed class Table<T> : ITable where T : Component
@@ -174,15 +174,18 @@ public sealed class GameWorld : IWorld
     public static string IndexedPathOf(Transform t) => IndexedPath(t);
 
     // The object at an IndexedPath in the active scene (null if this machine's hierarchy differs).
+    // Segments end in "#<sibling index>": split there, not at every '/', since object names can hold one
+    // (Developers' Hell: the floors are under "WALLS/WINDOWS/FLOORS", so no stain on them was found there:
+    // footprints and blood on those floors never appeared for the other player).
+    static readonly System.Text.RegularExpressions.Regex Segment = new(@"(.+?)#(\d+)(?:/|$)");
+
     public static GameObject FindByIndexedPath(string path)
     {
-        var parts = path.Split('/');
         Transform cur = null;
-        foreach (var part in parts)
+        foreach (System.Text.RegularExpressions.Match m in Segment.Matches(path))
         {
-            int hash = part.LastIndexOf('#');
-            if (hash < 0 || !int.TryParse(part.Substring(hash + 1), out int idx)) return null;
-            string name = part.Substring(0, hash);
+            int idx = int.Parse(m.Groups[2].Value);
+            string name = m.Groups[1].Value;
             Transform next = null;
             if (cur == null)
             {

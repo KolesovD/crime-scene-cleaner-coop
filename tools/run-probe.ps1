@@ -1,6 +1,6 @@
 # One-copy probe (Bot CSCCOOP_TEST=$Test, e.g. toolprobe), quiet on the second monitor; the copy's saves
 # are restored afterwards and the log kept in local\last-$Test\probe.log.
-param([string]$Test = "toolprobe", [int]$TimeoutSec = 400)
+param([string]$Test = "toolprobe", [int]$TimeoutSec = 400, [int]$Mission = -1)
 $root = Split-Path $PSScriptRoot -Parent
 Get-Process CrimeCleaner -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root\local\game-copy*" } | Stop-Process -Force
 Start-Sleep 2
@@ -14,6 +14,9 @@ Remove-Item $bak -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item $saves $bak -Recurse
 $p = & (Join-Path $PSScriptRoot "run-game.ps1") -Copy "game-copy" -Width 960 -Height 540 -Monitor 2 -Env @{
     CSCCOOP_TEST = $Test; CSCCOOP_QUIET = "1"; CSCCOOP_SHOT_DIR = (Join-Path $root "local")
+    # -Mission <id>: drive on from the first job to that one (11 = Game Dev)
+    CSCCOOP_MISSION = $(if ($Mission -ge 0) { "$Mission" } else { "" }); CSCCOOP_ANY_JOB = $(if ($Mission -ge 0) { "1" } else { "" })
+    CSCCOOP_TEST_SCENE = $(if ($Mission -eq 11) { "GameDevOffice" } else { "" })
     CSCCOOP_WINDOW = "$($b.X + 20),$($b.Y + 20),960,540,Crime Scene Cleaner - PROBE"
 }
 $t = 0

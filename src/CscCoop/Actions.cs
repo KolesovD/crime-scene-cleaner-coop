@@ -23,8 +23,10 @@ public static class Actions
         "Interactable.Interact",
         // A click on a ShortcutDoors goes Interact -> TryOpen (first time) / Toggle, which tween by themselves, not
         // through OpenDoors (ISIL; owner's manual test). Interact itself is not replayed: it checks the clicking
-        // player's side of the door, which the other player may not be on.
-        "ShortcutDoors.Toggle", "ShortcutDoors.TryOpen",
+        // player's side of the door, which the other player may not be on. Toggle is not here any more: replayed
+        // as a toggle, any missed or doubled event left the door inverted for good (owner's test on Developers'
+        // Hell); Doors shares the open/closed state after every door path instead. TryOpen only rattles.
+        "ShortcutDoors.TryOpen",
         "LabLiftLever.Interact", "LabSecretLiftController.Interact", "LabLiftController.ChangeLiftPosition",
         "ExtendableLadder.Interact", "ElectrickShockBox.Interact", "ElectricShockLeaver.Interact",
         "ChangeObjectPositionQueue.Interact", "ElectronicPicture.Interact", "BathController.Interact",
@@ -90,7 +92,9 @@ public static class Actions
     {
         var asm = typeof(Openable).Assembly;
         var tables = new Dictionary<Type, Act>();
-        foreach (var entry in Whitelist)
+        var entries = new List<string>(Whitelist);
+        if (Env.Get("CSCCOOP_MUTANT") == "door-old") entries.Add("ShortcutDoors.Toggle");   // the 0.4.2 rule
+        foreach (var entry in entries)
         {
             var dot = entry.IndexOf('.');
             var type = asm.GetType(entry.Substring(0, dot));

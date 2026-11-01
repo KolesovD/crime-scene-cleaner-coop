@@ -85,6 +85,7 @@ public partial class Bot : MonoBehaviour
         if (test == "modelprobe" && w != null) { ModelProbe.TickReport(); ModelProbe.Tick(w); return; }
         if (test == "toolprobe" && w != null) { ToolProbe.Tick(w); return; }
         if (test == "shardprobe" && w != null) { ShardProbe(w); return; }
+        if (test == "doorprobe" && w != null) { DoorProbe(s, inScene, w); return; }
 
         if (test == "jobs" && w != null) { JobTest(s, inScene, w); }
         if (test == "laptop" && w != null) { LaptopTest(s, inScene, w); return; }
@@ -121,6 +122,8 @@ public partial class Bot : MonoBehaviour
         if (test == "breakhit") BreakHitTest(t, ses, w);
         if (test == "bump") BumpTest(t, ses, w);
         if (test == "toolcarry") ToolCarryTest(t, ses, w);
+        if (test == "footsteps") FootstepsTest(t, ses, w);
+        if (test == "doorsync") DoorSyncTest(t, ses, w);
         if (test == "world2") { try { World2Test(t, ses, w); } catch (Exception e) { Plugin.L.LogError($"WORLD2 bot step {step} failed: {e}"); } }
         if (test != "jobs" && t > Env.Int("CSCCOOP_QUIT_AFTER", 40))
         {

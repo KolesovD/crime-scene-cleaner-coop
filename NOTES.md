@@ -437,6 +437,26 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Doors drifting apart, footprints missing on some floors (contributed, 2026-11-01)
+- Owner's report (Developers' Hell): a door open on the host is closed on the client, and the host closing it opens it
+  there; a footprint made on one machine sometimes doesn't appear on the other.
+- Doors (84 ShortcutDoors in GameDevOffice; doorprobe: tools/run-probe.ps1 -Test doorprobe -Mission 11): a click is
+  Interact -> OnOpen -> Toggle, a push TryForceOpen/TryForceClose, a switch ExternalToggle; none calls
+  OpenDoors/CloseDoors. Actions replayed Toggle as a toggle, Doors sent only OpenDoors/CloseDoors: any path not
+  replayed (a switch, a push) left the door inverted, and every later click kept it so. Now Toggle is not replayed;
+  Doors sends the state (isClosed, set at once by every path: field +224) after Toggle, TryForceOpen/Close,
+  ExternalToggle, OpenDoors, CloseDoors, ResetDoors, once per change, and the others apply it with
+  OpenDoors/CloseDoors. doorsync suite (-Test doorsync -Mission 11: the host opens a door by switch and one by
+  click, the client clicks, each clicked door gets two actions): PASS 4/4; mutant door-old (the 0.4.2 rule) FAIL,
+  door 0 open on the host and closed on the client. doors 17/17.
+- Footprints: the floors there are under a root named "WALLS/WINDOWS/FLOORS". GameWorld.FindByIndexedPath split
+  stain target paths at every '/', found no target, and ProjectBlood threw (NullReferenceException) on the other
+  machine: no stain on those floors was shared (footprints, blood, anything). The path is now split where a segment
+  ends in "#<sibling index>". footsteps suite (-Test footsteps -Mission 11: the client steps 12 times with bloody
+  shoes through FootprintSpawner.ProcessStep): 12 of 12 missing on the host before, PASS 5/5 after (same decal,
+  spot and strength). (Sending the decal prefab along was tried and made no difference: the blood type's prefab is
+  the same FootprintDecal.) stains 14/14, world2 20/20.
+
 ### Anyone can carry another player's bucket or lamp (contributed, 2026-11-01)
 - Owner's report: players can't move other players' buckets and lamps. Tool puppets refused every grab (Dyn.OnLocalGrab).
   Also, nothing stopped another player's E on a tool puppet: PortableItem.PickUp (DOTween scale, then

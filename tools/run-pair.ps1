@@ -33,6 +33,8 @@ foreach ($c in $copies) {
         CSCCOOP_CSV = $csv; CSCCOOP_QUIT_AFTER = "$QuitAfter"; CSCCOOP_LOSS_PCT = "$LossPct"; CSCCOOP_LATENCY_MS = "$LatencyMs"
         CSCCOOP_NO_BG = $(if ($NoBackground) { "1" } else { "" }); CSCCOOP_MUTANT = $Mutant; CSCCOOP_SKIP_INTRO = $(if ($SkipIntro) { "1" } else { "" })
         CSCCOOP_DUMP_KEYS = (Join-Path $root "local\keys-$($c.Name).txt")
+        # The bot waits this long in the main menu before loading the slot (default 25 s; 10 s was enough in all suites).
+        CSCCOOP_MENU_WAIT = "10"
         CSCCOOP_MISSION = $(if ($Test -eq "cctv" -and $c.Name -eq "host") { "5" } else { "" }); CSCCOOP_ANY_JOB = $(if ($Test -eq "cctv") { "1" } else { "" })
         # jobs: both players start from the main menu's Co-op screen (host: Host -> slot; client: Join -> slot -> play).
         CSCCOOP_VIA_MENU = $(if ($Test -in "jobs", "laptop") { "1" } else { "" }); CSCCOOP_SHOT_DIR = (Join-Path $root "local")

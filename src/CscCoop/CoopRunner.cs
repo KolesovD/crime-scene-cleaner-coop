@@ -171,6 +171,8 @@ public class CoopRunner : MonoBehaviour
         ghosts.Clear();
     }
 
+    void LateUpdate() => HandsOff.FreeCursor();
+
     void Update()
     {
         Watchdog.Frame(); Watchdog.Where = "frame start";
@@ -178,6 +180,7 @@ public class CoopRunner : MonoBehaviour
         IntroSkip.Tick(World);
         WindowPlacer.Tick();
         Quiet.Tick();
+        HandsOff.Tick();
         if (Session == null) return;
         // An unfocused Unity window pauses (no Update, no network): an alt-tabbed player froze the session for
         // everyone, and in the two-window test the unfocused copy stood still (world2 suite: the host's steps ran

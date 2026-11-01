@@ -45,6 +45,7 @@ public class Plugin : BasePlugin
         harmony.PatchAll(typeof(Cctv));
         harmony.PatchAll(typeof(ToolLook));
         Watchdog.Start();
+        HandsOff.Start();
         AddComponent<CoopRunner>();
         AddComponent<CoopMenu>();
         AddComponent<CoopScreen>();

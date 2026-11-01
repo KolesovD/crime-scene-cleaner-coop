@@ -252,6 +252,20 @@ the two copies' saves were at different missions.
   the scene are the 3 bodies (DrugDealerAnimAvatar, Girl02Avatar). So no player model is loaded in a job; it
   would have to come from the hub/intro scenes or Addressables. Unknown which.
 - Shards, using another player's bucket, re-dirtying (re-dirtying: not a gap, see the 2026-10-28 contribution).
+- Open, from the owner's test on Developers' Hell (2026-11-01; mission 11, scene GameDevOffice, run-pair -Mission 11):
+  - Elevator: one player's ride moves every other player too, even outside it. Not looked into; likely suspect:
+    Actions replays ElevatorDoor.SummonElevator / lift calls (GameDevOffice has 2 ElevatorDoor), and the elevator
+    script may move "the player" (each machine's own) rather than whoever stands in the car.
+  - Heavy furniture lifted by two players at the same moment ends up not lifted on one of them (Furniture: Heavy
+    events, HeavyGrabber; the grab check only refuses a piece someone else is already known to push).
+  - Two trash bags merging make duplicates until they end as one big bag: probably both owners run the merge
+    (GarbageBagConnector.OnCollisionEnter is blocked only on puppets, and a bag can be ours on one machine and the
+    other's bag ours on the other).
+  - Super Stacker arcade machine: using it opens the minigame for all players; the others then vanish, the
+    connection seems lost, the debug panel says "player in another place" though all are in the same level, and the
+    world stops syncing. Probably a replayed interaction (Actions: Interactable.Interact or similar) loads the
+    minigame on every machine, and the minigame changes the active scene, so the scene key differs.
+  - Personal flashlight: not shown to the other players (PlayerPose carries the tool in hand, not the flashlight).
 
 ## Unknown
 

@@ -47,6 +47,14 @@ untested. [Download the latest release](../../releases/latest). Русская �
 - The walkie-talkie in the Spa job is shared in code but wasn't tested by players.
 - Skipping the intro cutscene can leave the pizza box hanging next to the player in the apartment.
 - Not tested: 3–4 players, Nightmare mode, chapters after the sixth, the final mission.
+- Found on Developers' Hell, not fixed yet:
+  - **Elevator:** when one player rides it, every other player is moved up or down too, even outside it.
+  - **Heavy furniture lifted by two players at once** ends up not lifted on one player's screen.
+  - **Two trash bags merging** make duplicate bags for a while before they end up as one big bag.
+  - **Super Stacker arcade machine:** using it opens the minigame for all players; the other players then
+    disappear, the connection seems lost and the debug panel says "player in another place" although everyone is
+    in the same level, and the world stops being shared.
+  - **Personal flashlight:** players can't see each other's flashlight.
 
 ## Bug reports (F9)
 
@@ -89,4 +97,9 @@ Made with Claude Code (Anthropic) together with the players who tested it. Not a
 
 **Известные проблемы:** максимум мебели может отличаться (так считает
 сама игра); улучшенный инструмент у друга может выглядеть базовым; рация в Spa и перезапуск заказа вживую не
-проверены; после пропуска заставки коробка пиццы может висеть рядом с персонажем в квартире.
+проверены; после пропуска заставки коробка пиццы может висеть рядом с персонажем в квартире. Найдено в
+Developers' Hell, ещё не исправлено: лифт перемещает всех игроков, даже тех, кто не в нём; тяжёлая мебель, которую
+поднимают двое одновременно, у одного остаётся неподнятой; два сливающихся мешка с мусором какое-то время плодят
+копии; игровой автомат Super Stacker открывает мини-игру у всех, после чего другие игроки пропадают, связь
+теряется («игрок в другом месте», хотя все на одном уровне) и мир перестаёт синхронизироваться; личный фонарик
+другого игрока не виден.

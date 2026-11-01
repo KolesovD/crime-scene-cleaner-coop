@@ -7,6 +7,11 @@ if (-not (Test-Path (Join-Path $dir "CrimeCleaner.exe"))) { throw "no test copy 
 # Old log out of the way, so a caller waiting for a line can't match the previous run's.
 Remove-Item (Join-Path $dir "BepInEx\LogOutput.log") -ErrorAction SilentlyContinue
 $env:SteamAppId = "1040200"; $env:SteamGameId = "1040200"
+# Quiet bot runs give focus back to the window in front now (HandsOff.cs): the game takes it when its window opens.
+if ($Env["CSCCOOP_QUIET"] -eq "1" -and -not $Env.ContainsKey("CSCCOOP_FOCUS_BACK")) {
+    Add-Type -Namespace CscCoop -Name Win -MemberDefinition '[DllImport("user32.dll")] public static extern System.IntPtr GetForegroundWindow();' -ErrorAction SilentlyContinue
+    $Env["CSCCOOP_FOCUS_BACK"] = [string][CscCoop.Win]::GetForegroundWindow().ToInt64()
+}
 foreach ($k in $Env.Keys) { Set-Item "env:$k" $Env[$k] }
 $log = Join-Path $root "local\$Copy-unity.log"
 $p = Start-Process (Join-Path $dir "CrimeCleaner.exe") -WorkingDirectory $dir -PassThru `

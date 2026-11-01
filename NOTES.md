@@ -437,6 +437,23 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Test runs leave the mouse alone and skip the waits (contributed, 2026-11-01)
+- Quiet bot runs (CSCCOOP_QUIET=1) took the owner's mouse: the game takes focus when its window opens and again when
+  a job loads, and locks the cursor to its window every frame (Controller_Switch, FirstPersonAIO, MoveCamera,
+  InputController set Cursor.lockState). It also locks it while starting and then stalls for seconds loading the menu
+  (no frames): tools/mouse-check.ps1 saw the cursor clipped to one point for 4-8 s with Chrome in front.
+- HandsOff.cs (quiet runs only): cursor freed in CoopRunner.LateUpdate; when the game takes focus with no mouse button
+  down, focus goes back to the window that was in front when tools/run-game.ps1 started (CSCCOOP_FOCUS_BACK); a
+  background thread releases any cursor clip while another window is in front (it runs through the stalls). Rewired
+  already ignores input while unfocused (ignoreInputWhenAppNotInFocus was true), so nothing to do there.
+- Bot runs also skip the new game's intro cinematic (IntroController.Cinematic.Stop(); the game's OnSkipButtonPressed
+  throws with a default Rewired event) and the loading screen's key wait (LoadingScreenController.WaitingForSkip =
+  false), and run-pair passes CSCCOOP_MENU_WAIT=10 (was 25). Job cutscenes were already skipped (IntroSkip).
+- tools/mouse-check.ps1 every second during trash, stains and world2 (259 samples): never clipped, the game in front
+  once for under a second. Results: trash 8/8, stains 14/14, world2 20/20, each about 88 s (stains took 161 s without
+  the shorter menu wait and focus handling).
+- Manual runs (run-manual.ps1, no CSCCOOP_QUIET) keep normal mouse look.
+
 ### CCTV recordings and shards picked up by the other player (contributed fix, 2026-10-28)
 - CCTV (Smart House laptop, checked in game): the 10 recordings ("1/05/2023" .. "10/05/2023") exist as soon as
   the job loads, without the UI. The game makes them with `new CCTVRecord(name)`, a MonoBehaviour without a native

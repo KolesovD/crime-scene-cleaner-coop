@@ -3,6 +3,8 @@
 param([string]$Test = "items", [int]$QuitAfter = 40, [int]$LossPct = 0, [int]$LatencyMs = 0, [int]$TimeoutSec = 480, [string]$Mutant = "", [switch]$SkipIntro, [switch]$NoBackground, [switch]$Loud)
 # Quiet by default (the owner uses the PC meanwhile): small windows stacked on the second monitor (the
 # primary's right neighbour, else the primary's right edge), lowest quality, 30 fps, no sound. -Loud: as before.
+# cctv drives on from the first job to the Smart House inside the bots' time: 40 s ends it before the checks.
+if ($Test -eq "cctv" -and -not $PSBoundParameters.ContainsKey("QuitAfter")) { $QuitAfter = 75 }
 Add-Type -AssemblyName System.Windows.Forms
 $screens = [System.Windows.Forms.Screen]::AllScreens
 $mon = ($screens | Where-Object { -not $_.Primary } | Select-Object -First 1)

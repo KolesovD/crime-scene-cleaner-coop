@@ -12,9 +12,11 @@ namespace CscCoop;
 //    state event per object, 10 times a second while it moves, so late joiners get it too.
 //  - The others build a puppet from the same prefab (bags: the trash can's garbagePrefab; tools: a loaded
 //    PortableItem prefab of the same name), kinematic, following the owner's pose.
-//  - Grabbing a bag puppet takes the bag over (DynTake, ordered by the host): the grabber simulates it from
-//    then on and the old owner turns its copy into a puppet. Tool puppets can't be grabbed (each tool
-//    belongs to its player's inventory).
+//  - Grabbing a puppet takes it over (DynTake, ordered by the host): the grabber simulates it from then on and
+//    the old owner turns its copy into a puppet. That includes other players' tools: anyone can carry a friend's
+//    bucket or lamp (owner's request). Only the player it belongs to (the id's player number) can put a tool back
+//    into an inventory (PortableItem.PickUp): picked up by someone else it would be in two inventories; its owner
+//    takes it back first if someone else simulates it.
 //  - Buckets carry their water and dirt level (LiquidContainer), so the friend's bucket isn't shown empty
 //    (owner's request; looks only: nobody can use another player's bucket).
 //  - Gone (bag merged into another, bag into the van, tool picked up): alive=false removes the puppet; a bag
@@ -209,6 +211,8 @@ public static class Dyn
         return go;
     }
 
+    public static bool IsMine(GameObject go) => go != null && byGo.TryGetValue(go.Pointer, out var o) && o.Mine;
+
     public static bool IsPuppet(GameObject go) => go != null && byGo.TryGetValue(go.Pointer, out var o) && !o.Mine;
 
     // ---- taking over a bag ----
@@ -217,15 +221,39 @@ public static class Dyn
     public static bool OnLocalGrab(GrabableItemController item)
     {
         if (item == null || !byGo.TryGetValue(item.gameObject.Pointer, out var o) || o.Mine) return true;
-        if (o.Kind == Kind.Tool) return false;   // bags and shards can be taken over
+        if (o.Kind == Kind.Tool && Env.Get("CSCCOOP_MUTANT") == "tool-locked") return false;   // the 0.4.2 rule
         var s = S;
         if (s == null || !s.Synced) return true;
+        TakeOver(o, s);
+        return true;
+    }
+
+    static void TakeOver(Obj o, CoopCore.Session s)
+    {
         o.Mine = true; o.NextSend = 0;
         foreach (var rb in o.Go.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = false;
         byte me = s.Me;
         WorldEvents.Send(Ev.DynTake, w => { w.Write(o.Id); w.Write(me); });
         Taken++;
-        Plugin.L.LogInfo($"COOP took over bag {o.Id:X}");
+        Plugin.L.LogInfo($"COOP took over {o.Kind.ToString().ToLowerInvariant()} {o.Id:X} ({o.Name})");
+    }
+
+    // Whose inventory a tool belongs to: the player number its id was made with.
+    static byte BelongsTo(Obj o) => (byte)(o.Id >> 20);
+
+    // Putting a placed tool back into the inventory: only its own player's, and taken back first.
+    [HarmonyPatch(typeof(PortableItem), nameof(PortableItem.PickUp))] [HarmonyPrefix]
+    static bool ToolPickUp(PortableItem __instance)
+    {
+        var s = S;
+        if (s == null || !s.Synced || __instance == null || !byGo.TryGetValue(__instance.gameObject.Pointer, out var o) || o.Kind != Kind.Tool) return true;
+        byte me = s.Me == CoopCore.Session.NoPlayer ? (byte)0 : s.Me;
+        if (BelongsTo(o) != me)
+        {
+            Plugin.L.LogInfo($"COOP pick-up of player {BelongsTo(o)}'s {o.Name} refused: it isn't ours (it can be carried)");
+            return false;
+        }
+        if (!o.Mine) TakeOver(o, s);
         return true;
     }
 
@@ -240,7 +268,7 @@ public static class Dyn
             o.Mine = false;
             foreach (var rb in o.Go.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true;
             o.TargetPos = o.Go.transform.position; o.TargetRot = o.Go.transform.rotation;
-            Plugin.L.LogInfo($"COOP player {from} took over bag {o.Id:X}");
+            Plugin.L.LogInfo($"COOP player {from} took over {o.Kind.ToString().ToLowerInvariant()} {o.Id:X} ({o.Name})");
         }
     }
 

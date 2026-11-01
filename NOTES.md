@@ -437,6 +437,18 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Anyone can carry another player's bucket or lamp (contributed, 2026-11-01)
+- Owner's report: players can't move other players' buckets and lamps. Tool puppets refused every grab (Dyn.OnLocalGrab).
+  Also, nothing stopped another player's E on a tool puppet: PortableItem.PickUp (DOTween scale, then
+  PlayerInventory.TryAddItemToInventory) would have put the friend's tool into a second inventory.
+- Now a tool puppet is taken over like a bag (DynTake): the grabber simulates it, the owner's copy follows. Only the
+  player the tool belongs to (its id's player number) may PickUp it; if someone else simulates it then, the owner
+  takes it back first.
+- toolcarry suite (-Test toolcarry -Mission 11): the host takes its bucket out the game's way
+  (InventoryController.Equip(bucket, 0), then lets go), the client grabs and carries it 0.9 m; same spot on both; the
+  client's PickUp is refused; the host's PickUp works and it is gone on both. PASS 7/7; mutant tool-locked (the 0.4.2
+  rule) FAIL 4/7. trash 8/8.
+
 ### Items at rest get physics near the action (contributed, 2026-11-01)
 - Owner's report (Developers' Hell): physics worse than in the earlier csc-coop prototype. Cause: the host owns every
   resting item, and every other machine kept them kinematic. On the client a thrown item bounced off resting items as

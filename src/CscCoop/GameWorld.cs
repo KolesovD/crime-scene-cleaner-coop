@@ -59,6 +59,9 @@ public sealed class GameWorld : IWorld
         lastPos = Array.Empty<Vector3>(); movedAt = Array.Empty<float>();
         Taints.Clear(); taintIndex.Clear(); Bodies.Clear(); bodyIndex.Clear(); Garbage.Clear(); garbageIndex.Clear();
         foreach (var t in tables) t.Clear();
+        // The old job's fingerprints too: compared with the host's new job under the new scene name they "differed"
+        // all 31 tables on the client while it was still loading (harmless, BuildTable reset it, but logged).
+        Parts.Clear(); Off.Clear();
         Player = null; Grabber = null;
     }
 
@@ -162,6 +165,10 @@ public sealed class GameWorld : IWorld
         foreach (var c in UnityEngine.Object.FindObjectsOfType<T>(true))
         {
             if (c == null || c.gameObject.scene.name != scene) continue;
+            // Each player's own tools (lamps, buckets: PortableItem) are no scene objects: they differ per player,
+            // so a table with them differed and was switched off, or matched and a replay by index switched the other
+            // player's own lamp (owner's test). Dyn shares them.
+            if (c.GetComponentInParent<PortableItem>() != null && Env.Get("CSCCOOP_MUTANT") != "lamp-index") continue;
             if (pos == null) { rows.Add((IndexedPath(c.transform), c)); continue; }
             var p = pos(c);
             rows.Add(($"{Path(c.transform)}|{Mathf.RoundToInt(p.x * 100)},{Mathf.RoundToInt(p.y * 100)},{Mathf.RoundToInt(p.z * 100)}", c));

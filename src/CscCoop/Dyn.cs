@@ -42,6 +42,8 @@ public static class Dyn
         public float NextSend;
         public LiquidContainer Liquid;
         public PowerWasherStation Washer;
+        public LampController Lamp;
+        public bool SentLamp;
         public float SentWater = -1, SentTaint = -1;
         public string SentBuffs = "", AppliedBuffs = "";
     }
@@ -86,6 +88,7 @@ public static class Dyn
         if (s == null) return;
         if (sceneKey != W.SceneKey) OnScene();
         if (!s.Synced) return;
+        UvSlots.Tick();
         float now = Time.unscaledTime;
         foreach (var o in new List<Obj>(byId.Values))
         {
@@ -98,6 +101,7 @@ public static class Dyn
                 if (o.Liquid != null && (Mathf.Abs(o.Liquid.WaterLevel - o.SentWater) > 0.01f || Mathf.Abs(o.Liquid.TaintLevel - o.SentTaint) > 0.01f)) moved = true;
                 if (o.Washer != null && Mathf.Abs(o.Washer.waterLevel - o.SentWater) > 0.01f) moved = true;
                 if ((o.Liquid != null || o.Washer != null) && Buffs(o) != o.SentBuffs) moved = true;
+                if (o.Lamp != null && o.Lamp.isOn != o.SentLamp) moved = true;
                 if (!moved && o.Go.activeInHierarchy == true && o.NextSend > 0) continue;
                 o.NextSend = now + 0.1f;
                 SendState(o, o.Go.activeInHierarchy, false);
@@ -137,7 +141,8 @@ public static class Dyn
         bool washer = o.Washer != null;
         if (washer) water = o.Washer.waterLevel;
         string buffs = Buffs(o);
-        o.SentWater = water; o.SentTaint = taint; o.SentBuffs = buffs;
+        bool lamp = o.Lamp != null, lampOn = lamp && o.Lamp.isOn;
+        o.SentWater = water; o.SentTaint = taint; o.SentBuffs = buffs; o.SentLamp = lampOn;
         WorldEvents.Send(Ev.DynState, w =>
         {
             w.Write(o.Id); w.Write((byte)o.Kind); w.Write(o.Name ?? "");
@@ -146,6 +151,7 @@ public static class Dyn
             w.Write(alive); w.Write(inVan);
             w.Write(liquid); w.Write(water); w.Write(taint);
             w.Write(buffs); w.Write(washer);   // last: 0.4.2 readers stop before them
+            w.Write(lamp); w.Write(lampOn);
         }, StateBase | o.Id);
     }
 
@@ -160,6 +166,8 @@ public static class Dyn
         bool more = r.BaseStream.Position < r.BaseStream.Length;
         string buffs = more ? r.ReadString() : null;
         bool washer = more && r.ReadBoolean();
+        bool lampKnown = more && r.BaseStream.Position < r.BaseStream.Length;
+        bool lamp = lampKnown && r.ReadBoolean(), lampOn = lampKnown && r.ReadBoolean();
         byId.TryGetValue(id, out var o);
         if (o == null && kind == Kind.Shard)
         {
@@ -204,6 +212,8 @@ public static class Dyn
             if (Mathf.Abs(o.Liquid.TaintLevel - taint) > 0.005f) o.Liquid.SetTaintLevel(taint);
         }
         if (washer && o.Washer != null && Mathf.Abs(o.Washer.waterLevel - water) > 0.005f) { o.Washer.waterLevel = water; o.Washer.SetWaterLevel(); }
+        // Switch sets the light, Interact flips isOn (earlier prototype's lamp sync)
+        if (lamp && o.Lamp != null && o.Lamp.isOn != lampOn) { o.Lamp.isOn = lampOn; o.Lamp.Switch(lampOn); Plugin.L.LogInfo($"COOP {o.Name} {o.Id:X} switched {(lampOn ? "on" : "off")} by its player"); }
         if (buffs != null && buffs != o.AppliedBuffs && (o.Liquid != null || o.Washer != null))
         {
             o.AppliedBuffs = buffs;
@@ -218,6 +228,7 @@ public static class Dyn
         o.Liquid = o.Go.GetComponentInChildren<LiquidContainer>(true);
         var pi = o.Go.GetComponent<PortableItem>();
         o.Washer = pi != null ? pi.TryCast<PowerWasherStation>() : null;
+        o.Lamp = o.Go.GetComponentInChildren<LampController>(true);
     }
 
     // ---- cleaning products ----
@@ -270,6 +281,9 @@ public static class Dyn
     [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.TryAddWater))] [HarmonyPrefix] static void BucketWater(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
     [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.AddWater))] [HarmonyPrefix] static void BucketFill(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
     [HarmonyPatch(typeof(LiquidContainer), nameof(LiquidContainer.CleanWater))] [HarmonyPrefix] static void BucketEmpty(LiquidContainer __instance) { if (__instance.TryCast<LiquidContainer>() != null) Use(__instance); }
+    // Switching another player's lamp here: take it over, so its new on/off goes out from here.
+    [HarmonyPatch(typeof(LampController), nameof(LampController.Interact))] [HarmonyPrefix] static void LampSwitch(LampController __instance) { if (__instance.TryCast<LampController>() != null) Use(__instance); }
+    [HarmonyPatch(typeof(UVLampController), nameof(UVLampController.Interact))] [HarmonyPrefix] static void UvLampSwitch(UVLampController __instance) { if (__instance.TryCast<UVLampController>() != null) Use(__instance); }
     [HarmonyPatch(typeof(PowerWasherStation), nameof(PowerWasherStation.TryAddBuff))] [HarmonyPrefix] static void WasherProduct(PowerWasherStation __instance) { if (__instance.TryCast<PowerWasherStation>() != null) Use(__instance); }
     [HarmonyPatch(typeof(PowerWasherStation), nameof(PowerWasherStation.TryAddWater))] [HarmonyPrefix] static void WasherWater(PowerWasherStation __instance) { if (__instance.TryCast<PowerWasherStation>() != null) Use(__instance); }
 

@@ -141,6 +141,11 @@ public static class Actions
         return m.Invoke(c, null);
     }
 
+    // A player's own tool (PortableItem: lamps, buckets...) is in the scene table too, at the same place on every
+    // machine, so a replay by index switched the other player's own lamp (owner's test: turning on my lamp 1 turned
+    // on the friend's lamp 1). Tools are shared by Dyn, with the tool's own state.
+    static bool InTool(Component c) => c.GetComponentInParent<PortableItem>() != null && Env.Get("CSCCOOP_MUTANT") != "lamp-index";
+
     static void Pre() => depth++;
 
     static void Post(object __instance, MethodBase __originalMethod, object[] __args)
@@ -150,6 +155,7 @@ public static class Actions
         if (byMethod.TryGetValue(__originalMethod, out var a0) && CastTo(c, a0.Type) == null) return;   // a folded call on another type
         if (Skip.Contains(c.GetIl2CppType().Name)) return;
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Hub")) return;   // each player's own apartment
+        if (InTool(c)) return;
         if (!byMethod.TryGetValue(__originalMethod, out var act)) return;
         int i = act.IndexOf(c);
         if (i < 0) return;
@@ -177,7 +183,7 @@ public static class Actions
         if ((uint)id >= (uint)acts.Count) return;
         var act = acts[id];
         var target = act.Get(i);
-        if (target == null) return;
+        if (target == null || InTool(target)) return;
         Plugin.L.LogInfo($"COOP action {act.Name} on {act.Type.Name} {i} from another player");
         var typed = CastTo(target, act.Type);
         if (typed == null) return;

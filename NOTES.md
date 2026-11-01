@@ -437,6 +437,28 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Players' lamps and UV lamps (contributed, 2026-11-01)
+- Owner's report (Developers' Hell): switching my lamp 1 switches the friend's lamp 1; with 2 UV lamps each (4 on the
+  map), lamps over the limit don't light blood.
+- Lamps: each player's own tools (PortableItem) were in the scene tables (actions:LampController and others). With
+  the same lamps on both machines a replay by index switched the other player's own lamp; with different lamps the
+  table differed and was switched off (scene lamps unshared). Now GameWorld.Collect leaves anything under a
+  PortableItem out of every table, Actions never replays on one, and Dyn's tool state carries the lamp's on/off
+  (isOn, then Switch); switching another player's lamp (LampController/UVLampController.Interact) takes it over.
+- UV lamps light blood through a shader matrix: UVLampController takes a slot when enabled
+  (CleaningSenseController.TryGetSenseIndex into cleanerSenseIndex, -1 when none), Update lights only slots above 0,
+  OnDisable returns only those: 3 slots. The other player's UV lamps are copies here and took slots in the order
+  they appeared, so an own lamp could stay dark. UvSlots (every 0.5 s) gives the slots to own lamps that are on, then
+  the other player's that are on, then own off, then the other's off (ReturnIndex / TryGetSenseIndex). The game can't
+  light a fourth: with 4 UV lamps on, the other player's second lamp is dark on this screen.
+- Also: UVLampController.Interact does nothing unless the lamp stands (DetectObjectOrientation.IsStanding), and
+  Update switches a fallen one off.
+- lamps suite (-Test lamps -Mission 11): each player puts down a lamp and two UV lamps (client first, so the host's
+  copies of them come first); the host's lamp on, the client's off, the client switches the host's off later; all UV
+  lamps on. PASS 10/10 twice. Mutant uv-first (no UvSlots): the host's own lamp is on and dark (slot -1), FAIL.
+- The client's 31 "table differs" warnings while loading the next job were stale fingerprints of the old job
+  compared under the new scene name (BuildTable reset them); GameWorld.Clear now clears them.
+
 ### Cleaning products in buckets and power washers (contributed, 2026-11-01)
 - Owner's request: share the products in buckets (and the tools upgraded from them), as the earlier csc-coop
   prototype did. Only the bucket's water and dirt were shared; products not, and using another player's bucket

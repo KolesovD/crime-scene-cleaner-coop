@@ -51,7 +51,7 @@ public partial class Bot : MonoBehaviour
 
         // The test saves start in the intro hub, which drives straight into the first job: a manual test starts
         // its job from wherever the player first can move.
-        bool startHere = s.Contains("Hub") || ((test == "manual" || test == "cctv") && !s.Contains("Menu") && !s.Contains("Loading"));
+        bool startHere = s.Contains("Hub") || ((test == "manual" || test == "cctv" || Env.Get("CSCCOOP_TEST_SCENE") != "") && !s.Contains("Menu") && !s.Contains("Loading"));
         if (w?.Player != null && w.Player.CanMove && startHere && !missionStarted && inScene > 5)
         {
             if (!listed) { listed = true; ListMissions(); }
@@ -90,7 +90,9 @@ public partial class Bot : MonoBehaviour
         if (test == "laptop" && w != null) { LaptopTest(s, inScene, w); return; }
 
         var ses = CoopRunner.Instance?.Session;
-        if (readyAt < 0 && ses != null && ses.Synced && w.SceneKey != 0)
+        // run-pair -Mission: the test runs in that job (CSCCOOP_TEST_SCENE), not in the first job on the way there.
+        string only = Env.Get("CSCCOOP_TEST_SCENE");
+        if (readyAt < 0 && ses != null && ses.Synced && w.SceneKey != 0 && (only == "" || s == only))
             foreach (var rp in ses.Players.Values)
                 if (rp.SceneKey == w.SceneKey) { readyAt = Time.unscaledTime; Plugin.L.LogInfo("BOT ready: both players in the same job"); break; }
         if (readyAt < 0 && w?.SceneKey != 0 && inScene > 150)
@@ -117,6 +119,7 @@ public partial class Bot : MonoBehaviour
         if (test == "follow") FollowTest(t, ses, s);
         if (test == "figure") FigureTest(t, ses, w);
         if (test == "breakhit") BreakHitTest(t, ses, w);
+        if (test == "bump") BumpTest(t, ses, w);
         if (test == "world2") { try { World2Test(t, ses, w); } catch (Exception e) { Plugin.L.LogError($"WORLD2 bot step {step} failed: {e}"); } }
         if (test != "jobs" && t > Env.Int("CSCCOOP_QUIT_AFTER", 40))
         {
@@ -1130,6 +1133,8 @@ public partial class Bot : MonoBehaviour
             if (src == null) continue;
             foreach (var m in src) Plugin.L.LogInfo($"BOT mission {m.id} '{m.displayName}' scene {m.scene} completed {m.completed} active {m.active}");
         }
+        if (mc.missions?.data != null)
+            foreach (var m in mc.missions.data) if (m != null) Plugin.L.LogInfo($"BOT known mission {m.id} '{m.displayName}' scene {m.scene}");
     }
 
     // Client: walk up to the nearest loose item, grab it, back away with it, throw it. Host: try to take

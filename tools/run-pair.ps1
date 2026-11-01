@@ -1,10 +1,16 @@
 # Two-instance test on one PC: local\game-copy is the host, local\game-copy-2 the client (hard-linked).
 # Both bots load save slot 1 into the same job, connect over localhost UDP and run CSCCOOP_TEST=$Test.
-param([string]$Test = "items", [int]$QuitAfter = 40, [int]$LossPct = 0, [int]$LatencyMs = 0, [int]$TimeoutSec = 480, [string]$Mutant = "", [switch]$SkipIntro, [switch]$NoBackground, [switch]$Loud)
+param([string]$Test = "items", [int]$QuitAfter = 40, [int]$LossPct = 0, [int]$LatencyMs = 0, [int]$TimeoutSec = 480, [string]$Mutant = "", [switch]$SkipIntro, [switch]$NoBackground, [switch]$Loud, [int]$Mission = -1)
 # Quiet by default (the owner uses the PC meanwhile): small windows stacked on the second monitor (the
 # primary's right neighbour, else the primary's right edge), lowest quality, 30 fps, no sound. -Loud: as before.
 # cctv drives on from the first job to the Smart House inside the bots' time: 40 s ends it before the checks.
 if ($Test -eq "cctv" -and -not $PSBoundParameters.ContainsKey("QuitAfter")) { $QuitAfter = 75 }
+# -Mission <id>: the host drives on from the first job to that job (11 = Game Dev, "Developers' Hell"), the client follows.
+if ($Test -eq "cctv" -and $Mission -lt 0) { $Mission = 5 }
+if ($Mission -ge 0 -and -not $PSBoundParameters.ContainsKey("QuitAfter")) { $QuitAfter = [Math]::Max($QuitAfter, 75) }
+# The bots start the test in that job's scene (cctv keeps its own flow, which starts on the way).
+$testScene = @{ 11 = "GameDevOffice"; 5 = "SmartHouse" }[$Mission]
+if ($Test -eq "cctv" -or -not $testScene) { $testScene = "" }
 Add-Type -AssemblyName System.Windows.Forms
 $screens = [System.Windows.Forms.Screen]::AllScreens
 $mon = ($screens | Where-Object { -not $_.Primary } | Select-Object -First 1)
@@ -34,10 +40,10 @@ foreach ($c in $copies) {
         CSCCOOP_TEST = $Test; CSCCOOP_ROLE = $c.Name; CSCCOOP_PORT = "$($c.Port)"; CSCCOOP_HOST = "27901"
         CSCCOOP_CSV = $csv; CSCCOOP_QUIT_AFTER = "$QuitAfter"; CSCCOOP_LOSS_PCT = "$LossPct"; CSCCOOP_LATENCY_MS = "$LatencyMs"
         CSCCOOP_NO_BG = $(if ($NoBackground) { "1" } else { "" }); CSCCOOP_MUTANT = $Mutant; CSCCOOP_SKIP_INTRO = $(if ($SkipIntro) { "1" } else { "" })
-        CSCCOOP_DUMP_KEYS = (Join-Path $root "local\keys-$($c.Name).txt")
+        CSCCOOP_DUMP_KEYS = (Join-Path $root "local\keys-$($c.Name).txt"); CSCCOOP_TEST_SCENE = $testScene
         # The bot waits this long in the main menu before loading the slot (default 25 s; 10 s was enough in all suites).
         CSCCOOP_MENU_WAIT = "10"
-        CSCCOOP_MISSION = $(if ($Test -eq "cctv" -and $c.Name -eq "host") { "5" } else { "" }); CSCCOOP_ANY_JOB = $(if ($Test -eq "cctv") { "1" } else { "" })
+        CSCCOOP_MISSION = $(if ($Mission -ge 0 -and $c.Name -eq "host") { "$Mission" } else { "" }); CSCCOOP_ANY_JOB = $(if ($Mission -ge 0) { "1" } else { "" })
         # jobs: both players start from the main menu's Co-op screen (host: Host -> slot; client: Join -> slot -> play).
         CSCCOOP_VIA_MENU = $(if ($Test -in "jobs", "laptop") { "1" } else { "" }); CSCCOOP_SHOT_DIR = (Join-Path $root "local")
         # ... with "Новая игра" in the empty slot 3 (Slot3.es3; slot 1 of the test copies is a save inside a job).

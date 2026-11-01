@@ -437,6 +437,25 @@ victims' bodies" only on the host, a restart only on the host.
   saves it into every player's file via Ev.ReportNote, F9 again skips; the player is Block()ed while typing).
   world2 checks it end to end (the client's report: same id, png and txt on both, comment in both).
 
+### Items at rest get physics near the action (contributed, 2026-11-01)
+- Owner's report (Developers' Hell): physics worse than in the earlier csc-coop prototype. Cause: the host owns every
+  resting item, and every other machine kept them kinematic. On the client a thrown item bounced off resting items as
+  off a wall (bump suite with the old rule, mutant kinematic-rest: target moved 0.00 m), and nothing could be knocked
+  over except by a mop or hand hit (those claim the item).
+- First try, all resting items on local physics everywhere (as in the prototype): items started from the owner's pose
+  tipped over by themselves (vases 40 deg, bottles, a ball), 30 claims in seconds, and piles settled apart; putting
+  them back looped (28618 corrections in 30 s); Rigidbody.IsSleeping() said asleep while an item moved 20 cm.
+- Now (GameWorld.Smooth/WakeNearby/LocalPhysics): a remote item the owner has at rest gets physics here only within
+  1.2 m of our player (checked every 0.1 s) or within reach of an item we move (every frame, 0.8 m + 0.3 s of its
+  flight). Knocked away fast (> 0.5 m/s or 3 rad/s, > 3 cm or 6 deg), it is claimed (at most 3 claims a minute) and
+  the others follow; otherwise, once still again, it goes back to the owner's spot, kinematic. Moving is judged by
+  Track's per-frame movement, not IsSleeping.
+- bump suite (tools/run-pair.ps1 -Test bump -Mission 11, Developers' Hell): the client throws an item into a resting
+  item the host owns; it must be knocked away on both, end at the same spot, and all 1158 items must lie at the same
+  spots on both. PASS 7/7 twice (target 0.71 m, 0.17 m); mutant kinematic-rest FAIL. Also world2 20/20, trash 8/8,
+  breakhit 6/6, stains 14/14, items 8/8; bodies 12/13 (the shelf case, as on 0.4.2 here).
+- run-pair -Mission <id> runs any suite in that job (11 = Game Dev, scene GameDevOffice; the bot lists all missions).
+
 ### Test runs leave the mouse alone and skip the waits (contributed, 2026-11-01)
 - Quiet bot runs (CSCCOOP_QUIET=1) took the owner's mouse: the game takes focus when its window opens and again when
   a job loads, and locks the cursor to its window every frame (Controller_Switch, FirstPersonAIO, MoveCamera,

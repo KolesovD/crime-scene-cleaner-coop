@@ -55,6 +55,7 @@ untested. [Download the latest release](../../releases/latest). Русская �
     disappear, the connection seems lost and the debug panel says "player in another place" although everyone is
     in the same level, and the world stops being shared.
   - **Personal flashlight:** players can't see each other's flashlight.
+  - **End of a job:** the score animations on the report screen play twice, about a second apart.
 
 ## Bug reports (F9)
 
@@ -102,4 +103,5 @@ Developers' Hell, ещё не исправлено: лифт перемещае�
 поднимают двое одновременно, у одного остаётся неподнятой; два сливающихся мешка с мусором какое-то время плодят
 копии; игровой автомат Super Stacker открывает мини-игру у всех, после чего другие игроки пропадают, связь
 теряется («игрок в другом месте», хотя все на одном уровне) и мир перестаёт синхронизироваться; личный фонарик
-другого игрока не виден.
+другого игрока не виден; в конце заказа анимации очков на экране отчёта проигрываются дважды, примерно через
+секунду.

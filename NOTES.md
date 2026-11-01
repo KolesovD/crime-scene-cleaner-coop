@@ -266,6 +266,9 @@ the two copies' saves were at different missions.
     world stops syncing. Probably a replayed interaction (Actions: Interactable.Interact or similar) loads the
     minigame on every machine, and the minigame changes the active scene, so the scene key differs.
   - Personal flashlight: not shown to the other players (PlayerPose carries the tool in hand, not the flashlight).
+  - End of a job: the report's score animations play twice, about a second apart. Not looked into; likely the end of
+    the job reaches the report twice on a machine: once from its own leave and once from the other player's
+    (Ev.Leave -> Jobs.OnLeave), or a replayed call that opens the report.
 
 ## Unknown
 
